@@ -2,6 +2,7 @@ package br.com.rodrigobraz.LibraryTddApi.api.resources;
 
 import br.com.rodrigobraz.LibraryTddApi.api.dto.BookDTO;
 import br.com.rodrigobraz.LibraryTddApi.api.model.Book;
+import br.com.rodrigobraz.LibraryTddApi.exceptions.BusinessException;
 import br.com.rodrigobraz.LibraryTddApi.services.BookService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -38,13 +39,13 @@ public class BookControllerTest {
     BookService service;
 
     @Test
-    @DisplayName("Deve criar um livro com sucesso")
+    @DisplayName("Deve criar um livro com sucesso.")
     public void createBookTest() throws Exception {
 
-        BookDTO dto = BookDTO.builder().author("Rodrigo").title("Adventures").isbn("12345").build();
-        Book savedBook = Book.builder().id(11L).author("Rodrigo").title("Adventures").isbn("12345").build();
-        BDDMockito.given(service.save(Mockito.any(Book.class))).willReturn(savedBook);
+        BookDTO dto = createNewBook();
+        Book savedBook = Book.builder().id(10L).author("Artur").title("As aventuras").isbn("001").build();
 
+        BDDMockito.given(service.save(Mockito.any(Book.class))).willReturn(savedBook);
         String json = new ObjectMapper().writeValueAsString(dto);
 
         MockHttpServletRequestBuilder request = MockMvcRequestBuilders
@@ -55,18 +56,52 @@ public class BookControllerTest {
 
         mvc
                 .perform(request)
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("id").isNotEmpty())
-                .andExpect(jsonPath("id").value(11L))
-                .andExpect(jsonPath("author").value(dto.getAuthor()))
-                .andExpect(jsonPath("title").value(dto.getTitle()))
-                .andExpect(jsonPath("isbn").value(dto.getIsbn()))
-        ;
+                .andExpect( status().isCreated() )
+                .andExpect( jsonPath("id").value(10L) )
+                .andExpect( jsonPath("title").value(dto.getTitle()) )
+                .andExpect( jsonPath("author").value(dto.getAuthor()) )
+                .andExpect( jsonPath("isbn").value(dto.getIsbn()) );
     }
 
-    @Test
-    @DisplayName("Deve lancar erro de validacao quando nao houver dados corretos ao criar livro")
-    public void createInvalidBookTest() {
+    /**@Test
+    @DisplayName("Deve lançar erro de validação quando não houver dados suficiente para criação do livro.")
+    public void createInvalidBookTest() throws Exception {
 
+        BookDTO dto = createNewBook();
+        String json = new ObjectMapper().writeValueAsString(dto);
+
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .post(BOOK_API)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .content(json);
+
+        mvc.perform(request)
+                .andExpect( status().isBadRequest() );
+    }**/
+
+    @Test
+    @DisplayName("Deve lançar erro ao tentar cadastrar um livro com isbn já utilizado por outro.")
+    public void createBookWithDuplicatedIsbn() throws Exception {
+
+        BookDTO dto = createNewBook();
+        String json = new ObjectMapper().writeValueAsString(dto);
+        String mensagemErro = "Isbn já cadastrado.";
+        BDDMockito.given(service.save(Mockito.any(Book.class)))
+                .willThrow(new BusinessException(mensagemErro));
+
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .post(BOOK_API)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .content(json);
+
+        mvc.perform( request )
+                .andExpect(status().isBadRequest());
+
+    }
+
+    private BookDTO createNewBook() {
+        return BookDTO.builder().author("Artur").title("As aventuras").isbn("001").build();
     }
 }
